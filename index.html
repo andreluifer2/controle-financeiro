@@ -127,7 +127,7 @@
         <button class="dismiss" onclick="dismissBanner()">✕</button>
     </div>
 </div>
-<div id="offline-toast">📶 Você está offline — dados locais</div>
+<div id="offline-toast"></div>
 <div class="container">
     <div class="top-utility-bar">
         <div class="month-navigator">
@@ -590,8 +590,7 @@ function installPWA() { if (!deferredPrompt) return; deferredPrompt.prompt(); de
 function dismissBanner() { document.getElementById('pwa-install-banner').classList.remove('show'); }
 window.addEventListener('appinstalled', () => document.getElementById('pwa-install-banner').classList.remove('show'));
 function showOfflineToast(msg) { const toast=document.getElementById('offline-toast'); toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),3500); }
-window.addEventListener('offline', () => showOfflineToast('📶 Você está offline — dados locais'));
-window.addEventListener('online',  () => { showOfflineToast('✅ Conexão restabelecida'); loadMonthFromAirtable(appState.currentMonth, appState.currentYear); });
+window.addEventListener('online', () => loadMonthFromAirtable(appState.currentMonth, appState.currentYear));
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(r=>console.log('SW:',r.scope)).catch(e=>console.warn(e)); }); }
 
 // ================================================
