@@ -135,9 +135,12 @@
             <span class="month-display" id="current-month-display">Junho 2026</span>
             <button class="btn btn-secondary btn-sm" onclick="navigateMonth(1)">▶</button>
         </div>
-        <button class="theme-toggle-btn" onclick="toggleTheme()">
-            <span id="theme-icon">🌙</span> <span id="theme-text">Modo Escuro</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <span id="sync-status" title="Status Airtable" style="font-size:18px;cursor:default;"></span>
+            <button class="theme-toggle-btn" onclick="toggleTheme()">
+                <span id="theme-icon">🌙</span> <span id="theme-text">Modo Escuro</span>
+            </button>
+        </div>
     </div>
     <header>
         <div class="brand"><h1>Painel Financeiro</h1><p>Controle integrado inteligente</p></div>
@@ -202,6 +205,14 @@
         </div>
     </div>
 </div>
+<div class="modal" id="config-modal">
+    <div class="modal-content">
+        <div class="modal-title">⚙️ Configuração Airtable</div>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Cole seu Personal Access Token do Airtable para conectar o app aos seus dados. O token é salvo apenas no seu dispositivo.</p>
+        <div class="form-group"><label>Personal Access Token</label><input type="password" class="form-control" id="config-token" placeholder="patXXXXXX.XXXXXXXX"></div>
+        <div class="modal-actions"><button class="btn btn-primary" onclick="saveConfig()">Conectar</button></div>
+    </div>
+</div>
 <div class="modal" id="transaction-modal">
     <div class="modal-content">
         <div class="modal-title">Lançamento Estratégico</div>
@@ -215,114 +226,318 @@
     </div>
 </div>
 <script>
-const STORAGE_KEY='financeiro_pwa_data';
-let appState=loadState()||{currentMonth:new Date().getMonth(),currentYear:new Date().getFullYear(),darkTheme:false,transactions:[{id:1,type:'expense',desc:'Aluguel',value:1800,category:'Moradia',dueDate:'2026-06-05',paid:true},{id:2,type:'expense',desc:'Supermercado',value:650,category:'Alimentação',dueDate:'2026-06-10',paid:true},{id:3,type:'expense',desc:'Conta de Luz',value:180,category:'Serviços',dueDate:'2026-06-15',paid:false},{id:4,type:'expense',desc:'Plano de Saúde',value:420,category:'Saúde',dueDate:'2026-06-20',paid:false},{id:5,type:'expense',desc:'Internet',value:120,category:'Serviços',dueDate:'2026-06-08',paid:true},{id:6,type:'expense',desc:'Academia',value:90,category:'Saúde',dueDate:'2026-06-01',paid:true},{id:7,type:'income',desc:'Salário',value:6500,category:'Receita',dueDate:'2026-06-05',paid:true},{id:8,type:'income',desc:'Freelance',value:1200,category:'Receita',dueDate:'2026-06-15',paid:false},{id:9,type:'investment',desc:'Tesouro Selic',value:500,category:'Renda Fixa',institution:'Nubank',dueDate:'2026-06-10',paid:true},{id:10,type:'investment',desc:'Fundo Imobiliário',value:300,category:'FII',institution:'XP',dueDate:'2026-06-15',paid:false}],investmentGoal:12000};
-let nextId=Math.max(...appState.transactions.map(t=>t.id),0)+1;
-const MONTH_NAMES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CATEGORY_COLORS=['#0284c7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
-const CAT_LIMITS={Moradia:2000,Alimentação:800,Transporte:400,Saúde:600,Lazer:300,Educação:500,Serviços:400,Outros:300};
-function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(appState));}catch(e){}}
-function loadState(){try{const s=localStorage.getItem(STORAGE_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
-function toggleTheme(){appState.darkTheme=!appState.darkTheme;applyTheme();saveState();}
-function applyTheme(){document.body.classList.toggle('dark-theme',appState.darkTheme);document.getElementById('theme-icon').textContent=appState.darkTheme?'☀️':'🌙';document.getElementById('theme-text').textContent=appState.darkTheme?'Modo Claro':'Modo Escuro';document.querySelector('meta[name="theme-color"]').content=appState.darkTheme?'#0f172a':'#0284c7';}
-function navigateMonth(dir){appState.currentMonth+=dir;if(appState.currentMonth>11){appState.currentMonth=0;appState.currentYear++;}if(appState.currentMonth<0){appState.currentMonth=11;appState.currentYear--;}document.getElementById('current-month-display').textContent=`${MONTH_NAMES[appState.currentMonth]} ${appState.currentYear}`;saveState();renderAll();}
-function getMonthTransactions(type=null){return appState.transactions.filter(t=>{const d=new Date(t.dueDate+'T00:00:00');const match=d.getMonth()===appState.currentMonth&&d.getFullYear()===appState.currentYear;return type?match&&t.type===type:match;});}
-function switchTab(tabId){document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));document.getElementById(tabId).classList.add('active');event.target.classList.add('active');renderAll();}
-function renderAll(){renderOverview();renderCashflow();renderCategories();renderInvestments();}
-function fmt(v){return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
-function renderOverview(){
-    const expenses=getMonthTransactions('expense');
-    const incomes=getMonthTransactions('income');
-    const invests=getMonthTransactions('investment');
-    const totalExpense=expenses.reduce((s,t)=>s+t.value,0);
-    const totalIncome=incomes.reduce((s,t)=>s+t.value,0);
-    const totalInvest=invests.reduce((s,t)=>s+t.value,0);
-    const balance=totalIncome-totalExpense-totalInvest;
-    const paidExpenses=expenses.filter(t=>t.paid).reduce((s,t)=>s+t.value,0);
-    const pendingExp=totalExpense-paidExpenses;
-    // Total investido acumulado até o fim do mês atual
-    const allInvestedUpToMonth=appState.transactions.filter(t=>{
-        if(t.type!=='investment'||!t.paid)return false;
-        const d=new Date(t.dueDate+'T00:00:00');
-        return d.getFullYear()<appState.currentYear||(d.getFullYear()===appState.currentYear&&d.getMonth()<=appState.currentMonth);
-    }).reduce((s,t)=>s+t.value,0);
-    const cards=[
-        {title:'Receita Total',value:fmt(totalIncome),sub:`${incomes.filter(t=>t.paid).length} recebido(s)`,color:'var(--success)'},
-        {title:'Despesas Total',value:fmt(totalExpense),sub:`${fmt(pendingExp)} a pagar`,color:'var(--danger)'},
-        {title:'Investido no Mês',value:fmt(totalInvest),sub:'Aportes do mês',color:'var(--primary)'},
-        {title:'Total Investido',value:fmt(allInvestedUpToMonth),sub:'Acumulado até este mês',color:'var(--success)'},
-    ];
-    document.getElementById('overview-cards').innerHTML=cards.map(c=>`<div class="card"><div class="card-title">${c.title}</div><div class="card-value" style="color:${c.color}">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
-    renderEvolutionChart();
-    const alerts=[];
-    if(balance<0)alerts.push({type:'danger',icon:'🚨',msg:'Saldo negativo! Despesas superam receitas.'});
-    if(pendingExp>0)alerts.push({type:'warning',icon:'⏳',msg:`${fmt(pendingExp)} em despesas pendentes.`});
-    if(totalInvest>=totalIncome*0.2)alerts.push({type:'success',icon:'🎯',msg:`Você investiu ${((totalInvest/totalIncome)*100).toFixed(0)}% da renda — ótimo!`});
-    if(alerts.length===0)alerts.push({type:'success',icon:'✅',msg:'Tudo em ordem! Continue assim.'});
-    document.getElementById('alerts-container').innerHTML=alerts.map(a=>`<div class="alert-item alert-${a.type}">${a.icon} ${a.msg}</div>`).join('');
+// ================================================
+// AIRTABLE CONFIG (armazenado em localStorage, nunca no código)
+// ================================================
+const AT_BASE   = 'app0fux8pQz242bVu';
+const AT_MONTHS = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+function getToken() { return localStorage.getItem('at_token') || ''; }
+function setToken(t) { localStorage.setItem('at_token', t.trim()); }
+
+// ================================================
+// STATE
+// ================================================
+const STORAGE_KEY = 'financeiro_pwa_data';
+let appState = loadState() || {
+    currentMonth: new Date().getMonth(),
+    currentYear:  new Date().getFullYear(),
+    darkTheme: false,
+    transactions: [],
+    investmentGoal: 12000
+};
+let nextId = Math.max(0, ...appState.transactions.map(t => t.id || 0)) + 1;
+
+const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const CATEGORY_COLORS = ['#0284c7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const CAT_LIMITS = {Moradia:2000,Alimentação:800,Transporte:400,Saúde:600,Lazer:300,Educação:500,Serviços:400,Cartão:1500,Veículo:600,Imposto:500,Outros:300};
+
+function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appState)); } catch(e) {} }
+function loadState() { try { const s = localStorage.getItem(STORAGE_KEY); return s ? JSON.parse(s) : null; } catch(e) { return null; } }
+
+// ================================================
+// AIRTABLE HELPERS
+// ================================================
+function setSyncStatus(status, msg) {
+    const el = document.getElementById('sync-status');
+    if (!el) return;
+    const map = { loading:'🔄', synced:'☁️', error:'⚠️', saving:'💾' };
+    el.textContent = map[status] || '';
+    el.title = msg || { loading:'Carregando do Airtable…', synced:'Sincronizado com Airtable', saving:'Salvando no Airtable…', error:'Erro ao sincronizar' }[status] || '';
 }
-function renderEvolutionChart(){const months=[];for(let i=5;i>=0;i--){let m=appState.currentMonth-i;let y=appState.currentYear;if(m<0){m+=12;y--;}const ts=appState.transactions.filter(t=>{const d=new Date(t.dueDate+'T00:00:00');return d.getMonth()===m&&d.getFullYear()===y;});months.push({label:MONTH_NAMES[m].substring(0,3),income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0),expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});}const maxVal=Math.max(...months.map(m=>Math.max(m.income,m.expense)),1);const chartEl=document.getElementById('evolution-chart');chartEl.innerHTML=months.map(m=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:180px;"><div style="flex:1;background:var(--success);border-radius:4px 4px 0 0;height:${(m.income/maxVal)*100}%;opacity:0.85;"></div><div style="flex:1;background:var(--danger);border-radius:4px 4px 0 0;height:${(m.expense/maxVal)*100}%;opacity:0.85;"></div></div><span style="font-size:11px;color:var(--text-muted);font-weight:600;">${m.label}</span></div>`).join('');}
-function renderCashflow(){const all=getMonthTransactions();const expenses=all.filter(t=>t.type==='expense');const paid=expenses.filter(t=>t.paid).reduce((s,t)=>s+t.value,0);const pending=expenses.filter(t=>!t.paid).reduce((s,t)=>s+t.value,0);const today=new Date().toISOString().split('T')[0];document.getElementById('cashflow-cards').innerHTML=`<div class="card"><div class="card-title">Compromissos</div><div class="card-value">${expenses.length}</div><div class="card-sub">No mês</div></div><div class="card"><div class="card-title">Pago</div><div class="card-value" style="color:var(--success)">${fmt(paid)}</div><div class="card-sub">${expenses.filter(t=>t.paid).length} itens</div></div><div class="card"><div class="card-title">A Pagar</div><div class="card-value" style="color:var(--warning)">${fmt(pending)}</div><div class="card-sub">${expenses.filter(t=>!t.paid).length} itens</div></div><div class="card"><div class="card-title">Vence Hoje</div><div class="card-value" style="color:var(--primary)">${expenses.filter(t=>t.dueDate===today).length}</div><div class="card-sub">Itens hoje</div></div>`;const sorted=[...all].sort((a,b)=>a.dueDate.localeCompare(b.dueDate));document.getElementById('cashflow-table-body').innerHTML=sorted.map(t=>{let statusBadge,statusClass;if(t.paid){statusBadge='✅ Pago';statusClass='badge-paid';}else if(t.dueDate<today){statusBadge='🔴 Atrasado';statusClass='badge-overdue';}else if(t.dueDate===today){statusBadge='🔔 Hoje';statusClass='badge-today';}else{statusBadge='⏳ Pendente';statusClass='badge-pending';}const typeIcon=t.type==='income'?'💰':t.type==='investment'?'📈':'💸';return `<tr><td data-label="Vencimento">${t.dueDate.split('-').reverse().join('/')}</td><td data-label="Descrição">${typeIcon} ${t.desc}</td><td data-label="Categoria">${t.category}</td><td data-label="Valor">${fmt(t.value)}</td><td data-label="Status"><span class="badge ${statusClass}">${statusBadge}</span></td><td data-label="Ações"><div class="actions-cell">${!t.paid?`<button class="btn-action" onclick="togglePaid(${t.id})">✅</button>`:`<button class="btn-action" onclick="togglePaid(${t.id})">↩️</button>`}<button class="btn-action delete" onclick="deleteTransaction(${t.id})">🗑️</button></div></td></tr>`;}).join('');}
-function renderCategories(){const expenses=getMonthTransactions('expense');const catMap={};expenses.forEach(t=>{catMap[t.category]=(catMap[t.category]||0)+t.value;});const entries=Object.entries(catMap).sort((a,b)=>b[1]-a[1]);const total=entries.reduce((s,[,v])=>s+v,0)||1;const size=200,cx=100,cy=100,r=75,ir=45;let startAngle=-Math.PI/2;let paths='';entries.forEach(([cat,val],i)=>{const angle=(val/total)*2*Math.PI;const endAngle=startAngle+angle;const x1=cx+r*Math.cos(startAngle),y1=cy+r*Math.sin(startAngle);const x2=cx+r*Math.cos(endAngle),y2=cy+r*Math.sin(endAngle);const ix1=cx+ir*Math.cos(startAngle),iy1=cy+ir*Math.sin(startAngle);const ix2=cx+ir*Math.cos(endAngle),iy2=cy+ir*Math.sin(endAngle);const large=angle>Math.PI?1:0;const color=CATEGORY_COLORS[i%CATEGORY_COLORS.length];paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="${color}" opacity="0.9" />`;startAngle=endAngle;});const legend=entries.map(([cat,val],i)=>`<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:10px;height:10px;border-radius:50%;background:${CATEGORY_COLORS[i%CATEGORY_COLORS.length]};flex-shrink:0;"></span><span style="flex:1;color:var(--text-muted)">${cat}</span><span style="font-weight:700">${((val/total)*100).toFixed(0)}%</span></div>`).join('');document.getElementById('donut-chart-container').innerHTML=`<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg><div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">${legend}</div></div>`;document.getElementById('categories-ranking').innerHTML=entries.map(([cat,val],i)=>{const limit=CAT_LIMITS[cat]||500;const pct=Math.min((val/limit)*100,100);const color=pct>=100?'bg-danger':pct>=75?'bg-warning':'bg-success';return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span><span class="traffic-light ${color}"></span>${cat}</span><span style="font-weight:700">${fmt(val)} / ${fmt(limit)}</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:var(--${pct>=100?'danger':pct>=75?'warning':'success'})"></div></div></div>`;}).join('');}
-function renderInvestments(){
-    const all=appState.transactions.filter(t=>t.type==='investment');
-    const month=getMonthTransactions('investment');
-    const totalInvested=all.filter(t=>t.paid).reduce((s,t)=>s+t.value,0);
-    const monthInvest=month.reduce((s,t)=>s+t.value,0);
-    const goalPct=Math.min((totalInvested/appState.investmentGoal)*100,100);
-    // Meses distintos com aportes pagos
-    const monthsWithInvestments=new Set(all.filter(t=>t.paid).map(t=>{const d=new Date(t.dueDate+'T00:00:00');return `${d.getFullYear()}-${d.getMonth()}`;}));
-    const numMonths=monthsWithInvestments.size||1;
-    const avgMonthly=totalInvested/numMonths;
-    document.getElementById('investments-cards').innerHTML=`
+
+async function atFetch(method, path, body = null) {
+    const token = getToken();
+    if (!token) throw new Error('Token não configurado');
+    const opts = { method, headers: { 'Authorization': `Bearer ${token}` } };
+    if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    const res = await fetch(`https://api.airtable.com/v0/${AT_BASE}/${path}`, opts);
+    return res.json();
+}
+
+function mapAirtableToTransaction(record, month, year) {
+    const f = record.fields || {};
+    const cat    = f['Categoria']    || '';
+    const subCat = f['SubCategoria'] || '';
+    const day    = parseInt(f['Pagar']) || 5;
+    const dueDate = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+
+    let type, value, category;
+    if (cat === 'Receita') {
+        type = 'income'; value = f['Valor (R$)'] || 0; category = subCat || 'Salário';
+    } else if (cat === 'Aplicações') {
+        type = 'investment'; value = f['Aporte (R$)'] || 0; category = subCat || 'Investimento';
+    } else {
+        type = 'expense'; value = f['Valor (R$)'] || 0; category = subCat || cat || 'Outros';
+    }
+
+    return { id: nextId++, airtableId: record.id, airtableCategoria: cat, type, desc: f['Descrição'] || '', value, category, dueDate, paid: f['Pago'] || false };
+}
+
+function mapTransactionToAirtableFields(t) {
+    const cat = t.type === 'income' ? 'Receita' : t.type === 'investment' ? 'Aplicações' : (t.airtableCategoria || 'Outros');
+    const day = new Date(t.dueDate + 'T00:00:00').getDate();
+    const closestDay = String([5,20,30].reduce((p,c) => Math.abs(c-day) < Math.abs(p-day) ? c : p));
+    const fields = { 'Descrição': t.desc, 'Pago': t.paid, 'Pagar': closestDay, 'Categoria': cat };
+    if (t.type === 'investment') { fields['Aporte (R$)'] = t.value; } else { fields['Valor (R$)'] = t.value; }
+    if (t.category) fields['SubCategoria'] = t.category;
+    return fields;
+}
+
+async function loadMonthFromAirtable(month, year) {
+    setSyncStatus('loading');
+    try {
+        const table = encodeURIComponent(AT_MONTHS[month]);
+        let records = [], offset = null;
+        do {
+            const path = table + (offset ? `?offset=${encodeURIComponent(offset)}` : '');
+            const data = await atFetch('GET', path);
+            if (data.error) throw new Error(data.error.message);
+            records = records.concat(data.records || []);
+            offset = data.offset || null;
+        } while (offset);
+
+        // Remove transactions for this month/year, keep others
+        appState.transactions = appState.transactions.filter(t => {
+            const d = new Date(t.dueDate + 'T00:00:00');
+            return !(d.getMonth() === month && d.getFullYear() === year);
+        });
+        records.forEach(r => appState.transactions.push(mapAirtableToTransaction(r, month, year)));
+        saveState();
+        setSyncStatus('synced');
+        renderAll();
+    } catch(e) {
+        console.error('Airtable load error:', e);
+        setSyncStatus('error', 'Erro: ' + e.message);
+        showOfflineToast('⚠️ Erro Airtable: ' + e.message);
+        renderAll();
+    }
+}
+
+// ================================================
+// NAVIGATION
+// ================================================
+function toggleTheme() { appState.darkTheme = !appState.darkTheme; applyTheme(); saveState(); }
+function applyTheme() {
+    document.body.classList.toggle('dark-theme', appState.darkTheme);
+    document.getElementById('theme-icon').textContent = appState.darkTheme ? '☀️' : '🌙';
+    document.getElementById('theme-text').textContent = appState.darkTheme ? 'Modo Claro' : 'Modo Escuro';
+    document.querySelector('meta[name="theme-color"]').content = appState.darkTheme ? '#0f172a' : '#0284c7';
+}
+
+function navigateMonth(dir) {
+    appState.currentMonth += dir;
+    if (appState.currentMonth > 11) { appState.currentMonth = 0; appState.currentYear++; }
+    if (appState.currentMonth < 0)  { appState.currentMonth = 11; appState.currentYear--; }
+    document.getElementById('current-month-display').textContent = `${MONTH_NAMES[appState.currentMonth]} ${appState.currentYear}`;
+    saveState();
+    loadMonthFromAirtable(appState.currentMonth, appState.currentYear);
+}
+
+function getMonthTransactions(type = null) {
+    return appState.transactions.filter(t => {
+        const d = new Date(t.dueDate + 'T00:00:00');
+        const match = d.getMonth() === appState.currentMonth && d.getFullYear() === appState.currentYear;
+        return type ? match && t.type === type : match;
+    });
+}
+
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    event.target.classList.add('active');
+    renderAll();
+}
+
+function renderAll() { renderOverview(); renderCashflow(); renderCategories(); renderInvestments(); }
+function fmt(v) { return v.toLocaleString('pt-BR', { style:'currency', currency:'BRL' }); }
+
+// ================================================
+// RENDER FUNCTIONS (unchanged)
+// ================================================
+function renderOverview() {
+    const expenses = getMonthTransactions('expense');
+    const incomes  = getMonthTransactions('income');
+    const invests  = getMonthTransactions('investment');
+    const totalExpense = expenses.reduce((s,t) => s+t.value, 0);
+    const totalIncome  = incomes.reduce((s,t)  => s+t.value, 0);
+    const totalInvest  = invests.reduce((s,t)  => s+t.value, 0);
+    const balance = totalIncome - totalExpense - totalInvest;
+    const paidExpenses = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
+    const pendingExp = totalExpense - paidExpenses;
+    const allInvestedUpToMonth = appState.transactions.filter(t => {
+        if (t.type !== 'investment' || !t.paid) return false;
+        const d = new Date(t.dueDate + 'T00:00:00');
+        return d.getFullYear() < appState.currentYear || (d.getFullYear() === appState.currentYear && d.getMonth() <= appState.currentMonth);
+    }).reduce((s,t) => s+t.value, 0);
+    const cards = [
+        {title:'Receita Total',    value:fmt(totalIncome),  sub:`${incomes.filter(t=>t.paid).length} recebido(s)`,  color:'var(--success)'},
+        {title:'Despesas Total',   value:fmt(totalExpense), sub:`${fmt(pendingExp)} a pagar`,                        color:'var(--danger)'},
+        {title:'Investido no Mês', value:fmt(totalInvest),  sub:'Aportes do mês',                                   color:'var(--primary)'},
+        {title:'Total Investido',  value:fmt(allInvestedUpToMonth), sub:'Acumulado até este mês',                   color:'var(--success)'},
+    ];
+    document.getElementById('overview-cards').innerHTML = cards.map(c => `<div class="card"><div class="card-title">${c.title}</div><div class="card-value" style="color:${c.color}">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
+    renderEvolutionChart();
+    const alerts = [];
+    if (balance < 0) alerts.push({type:'danger',  icon:'🚨', msg:'Saldo negativo! Despesas superam receitas.'});
+    if (pendingExp > 0) alerts.push({type:'warning', icon:'⏳', msg:`${fmt(pendingExp)} em despesas pendentes.`});
+    if (totalIncome > 0 && totalInvest >= totalIncome * 0.2) alerts.push({type:'success', icon:'🎯', msg:`Você investiu ${((totalInvest/totalIncome)*100).toFixed(0)}% da renda — ótimo!`});
+    if (alerts.length === 0) alerts.push({type:'success', icon:'✅', msg:'Tudo em ordem! Continue assim.'});
+    document.getElementById('alerts-container').innerHTML = alerts.map(a => `<div class="alert-item alert-${a.type}">${a.icon} ${a.msg}</div>`).join('');
+}
+
+function renderEvolutionChart() {
+    const months = [];
+    for (let i = 5; i >= 0; i--) {
+        let m = appState.currentMonth - i, y = appState.currentYear;
+        if (m < 0) { m += 12; y--; }
+        const ts = appState.transactions.filter(t => { const d = new Date(t.dueDate+'T00:00:00'); return d.getMonth()===m && d.getFullYear()===y; });
+        months.push({label:MONTH_NAMES[m].substring(0,3), income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0), expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});
+    }
+    const maxVal = Math.max(...months.map(m => Math.max(m.income, m.expense)), 1);
+    document.getElementById('evolution-chart').innerHTML = months.map(m => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:180px;"><div style="flex:1;background:var(--success);border-radius:4px 4px 0 0;height:${(m.income/maxVal)*100}%;opacity:0.85;"></div><div style="flex:1;background:var(--danger);border-radius:4px 4px 0 0;height:${(m.expense/maxVal)*100}%;opacity:0.85;"></div></div><span style="font-size:11px;color:var(--text-muted);font-weight:600;">${m.label}</span></div>`).join('');
+}
+
+function renderCashflow() {
+    const all = getMonthTransactions();
+    const expenses = all.filter(t => t.type === 'expense');
+    const paid = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
+    const pending = expenses.filter(t => !t.paid).reduce((s,t) => s+t.value, 0);
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('cashflow-cards').innerHTML = `<div class="card"><div class="card-title">Compromissos</div><div class="card-value">${expenses.length}</div><div class="card-sub">No mês</div></div><div class="card"><div class="card-title">Pago</div><div class="card-value" style="color:var(--success)">${fmt(paid)}</div><div class="card-sub">${expenses.filter(t=>t.paid).length} itens</div></div><div class="card"><div class="card-title">A Pagar</div><div class="card-value" style="color:var(--warning)">${fmt(pending)}</div><div class="card-sub">${expenses.filter(t=>!t.paid).length} itens</div></div><div class="card"><div class="card-title">Vence Hoje</div><div class="card-value" style="color:var(--primary)">${expenses.filter(t=>t.dueDate===today).length}</div><div class="card-sub">Itens hoje</div></div>`;
+    const sorted = [...all].sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+    document.getElementById('cashflow-table-body').innerHTML = sorted.map(t => {
+        let statusBadge, statusClass;
+        if (t.paid) { statusBadge='✅ Pago'; statusClass='badge-paid'; }
+        else if (t.dueDate < today) { statusBadge='🔴 Atrasado'; statusClass='badge-overdue'; }
+        else if (t.dueDate === today) { statusBadge='🔔 Hoje'; statusClass='badge-today'; }
+        else { statusBadge='⏳ Pendente'; statusClass='badge-pending'; }
+        const typeIcon = t.type==='income'?'💰':t.type==='investment'?'📈':'💸';
+        return `<tr><td data-label="Vencimento">${t.dueDate.split('-').reverse().join('/')}</td><td data-label="Descrição">${typeIcon} ${t.desc}</td><td data-label="Categoria">${t.category}</td><td data-label="Valor">${fmt(t.value)}</td><td data-label="Status"><span class="badge ${statusClass}">${statusBadge}</span></td><td data-label="Ações"><div class="actions-cell">${!t.paid?`<button class="btn-action" onclick="togglePaid(${t.id})">✅</button>`:`<button class="btn-action" onclick="togglePaid(${t.id})">↩️</button>`}<button class="btn-action delete" onclick="deleteTransaction(${t.id})">🗑️</button></div></td></tr>`;
+    }).join('');
+}
+
+function renderCategories() {
+    const expenses = getMonthTransactions('expense');
+    const catMap = {};
+    expenses.forEach(t => { catMap[t.category] = (catMap[t.category]||0) + t.value; });
+    const entries = Object.entries(catMap).sort((a,b) => b[1]-a[1]);
+    const total = entries.reduce((s,[,v]) => s+v, 0) || 1;
+    const size=200,cx=100,cy=100,r=75,ir=45; let startAngle=-Math.PI/2, paths='';
+    entries.forEach(([cat,val],i) => {
+        const angle=(val/total)*2*Math.PI, endAngle=startAngle+angle;
+        const x1=cx+r*Math.cos(startAngle),y1=cy+r*Math.sin(startAngle),x2=cx+r*Math.cos(endAngle),y2=cy+r*Math.sin(endAngle);
+        const ix1=cx+ir*Math.cos(startAngle),iy1=cy+ir*Math.sin(startAngle),ix2=cx+ir*Math.cos(endAngle),iy2=cy+ir*Math.sin(endAngle);
+        const large=angle>Math.PI?1:0, color=CATEGORY_COLORS[i%CATEGORY_COLORS.length];
+        paths+=`<path d="M ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${ir} ${ir} 0 ${large} 0 ${ix1} ${iy1} Z" fill="${color}" opacity="0.9" />`; startAngle=endAngle;
+    });
+    const legend = entries.map(([cat,val],i) => `<div style="display:flex;align-items:center;gap:8px;font-size:12px;"><span style="width:10px;height:10px;border-radius:50%;background:${CATEGORY_COLORS[i%CATEGORY_COLORS.length]};flex-shrink:0;"></span><span style="flex:1;color:var(--text-muted)">${cat}</span><span style="font-weight:700">${((val/total)*100).toFixed(0)}%</span></div>`).join('');
+    document.getElementById('donut-chart-container').innerHTML = `<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg><div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">${legend}</div></div>`;
+    document.getElementById('categories-ranking').innerHTML = entries.map(([cat,val]) => {
+        const limit=CAT_LIMITS[cat]||500, pct=Math.min((val/limit)*100,100), color=pct>=100?'bg-danger':pct>=75?'bg-warning':'bg-success';
+        return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span><span class="traffic-light ${color}"></span>${cat}</span><span style="font-weight:700">${fmt(val)} / ${fmt(limit)}</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:var(--${pct>=100?'danger':pct>=75?'warning':'success'})"></div></div></div>`;
+    }).join('');
+}
+
+function renderInvestments() {
+    const all = appState.transactions.filter(t => t.type === 'investment');
+    const month = getMonthTransactions('investment');
+    const totalInvested = all.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
+    const monthInvest = month.reduce((s,t) => s+t.value, 0);
+    const goalPct = Math.min((totalInvested/appState.investmentGoal)*100, 100);
+    const monthsWithInvestments = new Set(all.filter(t=>t.paid).map(t=>{const d=new Date(t.dueDate+'T00:00:00');return `${d.getFullYear()}-${d.getMonth()}`;}));
+    const numMonths = monthsWithInvestments.size || 1;
+    document.getElementById('investments-cards').innerHTML = `
         <div class="card"><div class="card-title">Total Acumulado</div><div class="card-value" style="color:var(--primary)">${fmt(totalInvested)}</div><div class="card-sub">Todos os períodos</div></div>
         <div class="card"><div class="card-title">Este Mês</div><div class="card-value">${fmt(monthInvest)}</div><div class="card-sub">${month.length} aportes</div></div>
         <div class="card"><div class="card-title">Aporte Total</div><div class="card-value" style="color:var(--success)">${fmt(totalInvested)}</div><div class="card-sub">${all.filter(t=>t.paid).length} aportes realizados</div></div>
-        <div class="card"><div class="card-title">Média por Mês</div><div class="card-value" style="color:var(--warning)">${fmt(avgMonthly)}</div><div class="card-sub">Em ${numMonths} ${numMonths===1?'mês':'meses'} com aportes</div></div>
-    `;
-    document.getElementById('investment-goal-pct').textContent=`${goalPct.toFixed(0)}%`;
-    document.getElementById('investment-goal-bar').style.width=`${goalPct}%`;
-    document.getElementById('investment-goal-desc').textContent=`${fmt(totalInvested)} investidos de ${fmt(appState.investmentGoal)} de meta`;
-    const instMap={};all.filter(t=>t.paid).forEach(t=>{const inst=t.institution||'Outros';instMap[inst]=(instMap[inst]||0)+t.value;});
-    const instEntries=Object.entries(instMap);const instTotal=instEntries.reduce((s,[,v])=>s+v,0)||1;
-    document.getElementById('institution-distribution').innerHTML=instEntries.map(([inst,val],i)=>{const pct=(val/instTotal)*100;return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span style="font-weight:600">${inst}</span><span>${fmt(val)} (${pct.toFixed(0)}%)</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:${CATEGORY_COLORS[i%CATEGORY_COLORS.length]}"></div></div></div>`;}).join('')||'<p style="color:var(--text-muted);font-size:14px;">Nenhum investimento registrado.</p>';
+        <div class="card"><div class="card-title">Média por Mês</div><div class="card-value" style="color:var(--warning)">${fmt(totalInvested/numMonths)}</div><div class="card-sub">Em ${numMonths} ${numMonths===1?'mês':'meses'} com aportes</div></div>`;
+    document.getElementById('investment-goal-pct').textContent = `${goalPct.toFixed(0)}%`;
+    document.getElementById('investment-goal-bar').style.width = `${goalPct}%`;
+    document.getElementById('investment-goal-desc').textContent = `${fmt(totalInvested)} investidos de ${fmt(appState.investmentGoal)} de meta`;
+    const instMap = {}; all.filter(t=>t.paid).forEach(t=>{const inst=t.institution||'Outros';instMap[inst]=(instMap[inst]||0)+t.value;});
+    const instEntries = Object.entries(instMap), instTotal = instEntries.reduce((s,[,v])=>s+v,0)||1;
+    document.getElementById('institution-distribution').innerHTML = instEntries.map(([inst,val],i)=>{const pct=(val/instTotal)*100;return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span style="font-weight:600">${inst}</span><span>${fmt(val)} (${pct.toFixed(0)}%)</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:${CATEGORY_COLORS[i%CATEGORY_COLORS.length]}"></div></div></div>`;}).join('') || '<p style="color:var(--text-muted);font-size:14px;">Nenhum investimento registrado.</p>';
 }
-function togglePaid(id){const t=appState.transactions.find(t=>t.id===id);if(t){t.paid=!t.paid;saveState();renderAll();}}
-function deleteTransaction(id){if(!confirm('Excluir este lançamento?'))return;appState.transactions=appState.transactions.filter(t=>t.id!==id);saveState();renderAll();}
+
+// ================================================
+// AÇÕES COM SINCRONIZAÇÃO AIRTABLE
+// ================================================
+async function togglePaid(id) {
+    const t = appState.transactions.find(t => t.id === id);
+    if (!t) return;
+    t.paid = !t.paid;
+    saveState(); renderAll();
+    if (t.airtableId) {
+        setSyncStatus('saving');
+        try {
+            const table = encodeURIComponent(AT_MONTHS[new Date(t.dueDate+'T00:00:00').getMonth()]);
+            const res = await atFetch('PATCH', `${table}/${t.airtableId}`, { fields: { 'Pago': t.paid } });
+            if (res.error) throw new Error(res.error.message);
+            setSyncStatus('synced');
+        } catch(e) { setSyncStatus('error', 'Erro ao atualizar: ' + e.message); }
+    }
+}
+
+async function deleteTransaction(id) {
+    if (!confirm('Excluir este lançamento?')) return;
+    const t = appState.transactions.find(t => t.id === id);
+    appState.transactions = appState.transactions.filter(t => t.id !== id);
+    saveState(); renderAll();
+    if (t && t.airtableId) {
+        setSyncStatus('saving');
+        try {
+            const table = encodeURIComponent(AT_MONTHS[new Date(t.dueDate+'T00:00:00').getMonth()]);
+            const res = await atFetch('DELETE', `${table}/${t.airtableId}`);
+            if (res.error) throw new Error(res.error.message);
+            setSyncStatus('synced');
+        } catch(e) { setSyncStatus('error', 'Erro ao excluir: ' + e.message); }
+    }
+}
+
 // ================================================
 // CATEGORIAS POR TIPO
 // ================================================
 const CATEGORIES_BY_TYPE = {
-    expense:    ['Moradia','Alimentação','Transporte','Saúde','Lazer','Educação','Serviços','Outros'],
-    income:     ['Salário','Freelance','Investimentos (Retorno)','Outros'],
-    investment: ['Renda Fixa','Ações','FII','Cripto','Internacional'],
+    expense:    ['Moradia','Alimentação','Transporte','Saúde','Lazer','Educação','Serviços','Cartão','Veículo','Imposto','Outros'],
+    income:     ['Salário','Férias','13º','Freelance','Outros'],
+    investment: ['Investimento','Renda Fixa','Ações','FII','Cripto','Internacional'],
 };
 
 function updateCategorySelect(type) {
     const sel = document.getElementById('form-category');
-    const cats = CATEGORIES_BY_TYPE[type] || CATEGORIES_BY_TYPE['expense'];
-    sel.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+    sel.innerHTML = (CATEGORIES_BY_TYPE[type]||CATEGORIES_BY_TYPE['expense']).map(c=>`<option value="${c}">${c}</option>`).join('');
 }
 
 // ================================================
 // MODAL
 // ================================================
 function openModal() {
-    // Reset tipo para despesa
-    const typeEl = document.getElementById('form-type');
-    typeEl.value = 'expense';
-
-    // Atualiza categorias para despesa
+    document.getElementById('form-type').value = 'expense';
     updateCategorySelect('expense');
-
-    // Campo custodiante oculto (padrão para expense)
     document.getElementById('form-group-institution').style.display = 'none';
-
-    // Data inteligente: 1º dia do mês/ano que o usuário está visualizando
-    const m = String(appState.currentMonth + 1).padStart(2, '0');
-    const y = appState.currentYear;
-    document.getElementById('form-duedate').value = `${y}-${m}-01`;
-
+    const m = String(appState.currentMonth+1).padStart(2,'0');
+    document.getElementById('form-duedate').value = `${appState.currentYear}-${m}-01`;
     document.getElementById('transaction-modal').classList.add('active');
 }
 
@@ -334,23 +549,82 @@ function closeModal() {
 
 function toggleFormFields() {
     const type = document.getElementById('form-type').value;
-    // Mostra/oculta campo custodiante
-    document.getElementById('form-group-institution').style.display = type === 'investment' ? 'block' : 'none';
-    // Atualiza categorias conforme tipo selecionado
+    document.getElementById('form-group-institution').style.display = type==='investment' ? 'block' : 'none';
     updateCategorySelect(type);
 }
-function handleFormSubmit(){const type=document.getElementById('form-type').value;const desc=document.getElementById('form-desc').value.trim();const value=parseFloat(document.getElementById('form-value').value);const category=document.getElementById('form-category').value;const dueDate=document.getElementById('form-duedate').value;const institution=document.getElementById('form-institution').value.trim();if(!desc||!value||!dueDate){alert('Preencha todos os campos obrigatórios.');return;}appState.transactions.push({id:nextId++,type,desc,value,category,dueDate,institution:institution||undefined,paid:false});saveState();closeModal();renderAll();}
-let deferredPrompt=null;
-window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;document.getElementById('pwa-install-banner').classList.add('show');});
-function installPWA(){if(!deferredPrompt)return;deferredPrompt.prompt();deferredPrompt.userChoice.then(()=>{deferredPrompt=null;document.getElementById('pwa-install-banner').classList.remove('show');});}
-function dismissBanner(){document.getElementById('pwa-install-banner').classList.remove('show');}
-window.addEventListener('appinstalled',()=>document.getElementById('pwa-install-banner').classList.remove('show'));
-function showOfflineToast(msg){const toast=document.getElementById('offline-toast');toast.textContent=msg;toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3000);}
-window.addEventListener('offline',()=>showOfflineToast('📶 Você está offline — dados locais'));
-window.addEventListener('online',()=>showOfflineToast('✅ Conexão restabelecida'));
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').then(r=>console.log('SW:',r.scope)).catch(e=>console.warn(e));});}
-document.getElementById('current-month-display').textContent=`${MONTH_NAMES[appState.currentMonth]} ${appState.currentYear}`;
-applyTheme();renderAll();
+
+async function handleFormSubmit() {
+    const type        = document.getElementById('form-type').value;
+    const desc        = document.getElementById('form-desc').value.trim();
+    const value       = parseFloat(document.getElementById('form-value').value);
+    const category    = document.getElementById('form-category').value;
+    const dueDate     = document.getElementById('form-duedate').value;
+    const institution = document.getElementById('form-institution').value.trim();
+    if (!desc || !value || !dueDate) { alert('Preencha todos os campos obrigatórios.'); return; }
+
+    const newT = { id: nextId++, type, desc, value, category, dueDate, institution: institution||undefined, paid: false };
+    appState.transactions.push(newT);
+    saveState(); closeModal(); renderAll();
+
+    const tMonth = new Date(dueDate+'T00:00:00').getMonth();
+    setSyncStatus('saving');
+    try {
+        const table = encodeURIComponent(AT_MONTHS[tMonth]);
+        const res = await atFetch('POST', table, { fields: mapTransactionToAirtableFields(newT) });
+        if (res.error) throw new Error(res.error.message);
+        newT.airtableId = res.id;
+        saveState();
+        setSyncStatus('synced');
+    } catch(e) {
+        setSyncStatus('error', 'Erro ao salvar: ' + e.message);
+        showOfflineToast('⚠️ Salvo localmente — erro no Airtable');
+    }
+}
+
+// ================================================
+// PWA / OFFLINE
+// ================================================
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferredPrompt=e; document.getElementById('pwa-install-banner').classList.add('show'); });
+function installPWA() { if (!deferredPrompt) return; deferredPrompt.prompt(); deferredPrompt.userChoice.then(()=>{ deferredPrompt=null; document.getElementById('pwa-install-banner').classList.remove('show'); }); }
+function dismissBanner() { document.getElementById('pwa-install-banner').classList.remove('show'); }
+window.addEventListener('appinstalled', () => document.getElementById('pwa-install-banner').classList.remove('show'));
+function showOfflineToast(msg) { const toast=document.getElementById('offline-toast'); toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),3500); }
+window.addEventListener('offline', () => showOfflineToast('📶 Você está offline — dados locais'));
+window.addEventListener('online',  () => { showOfflineToast('✅ Conexão restabelecida'); loadMonthFromAirtable(appState.currentMonth, appState.currentYear); });
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('./sw.js').then(r=>console.log('SW:',r.scope)).catch(e=>console.warn(e)); }); }
+
+// ================================================
+// CONFIG MODAL
+// ================================================
+function saveConfig() {
+    const token = document.getElementById('config-token').value.trim();
+    if (!token) { alert('Cole o token do Airtable.'); return; }
+    setToken(token);
+    document.getElementById('config-modal').classList.remove('active');
+    loadMonthFromAirtable(appState.currentMonth, appState.currentYear);
+}
+
+// Botão de configuração no header
+document.querySelector('.brand').insertAdjacentHTML('afterend',
+    '<button class="btn btn-secondary btn-sm" onclick="openConfig()" style="align-self:center;" title="Configurar Airtable">⚙️</button>'
+);
+function openConfig() {
+    document.getElementById('config-token').value = getToken();
+    document.getElementById('config-modal').classList.add('active');
+}
+
+// ================================================
+// INIT
+// ================================================
+document.getElementById('current-month-display').textContent = `${MONTH_NAMES[appState.currentMonth]} ${appState.currentYear}`;
+applyTheme();
+renderAll();
+if (getToken()) {
+    loadMonthFromAirtable(appState.currentMonth, appState.currentYear);
+} else {
+    document.getElementById('config-modal').classList.add('active');
+}
 </script>
 </body>
 </html>
