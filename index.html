@@ -285,7 +285,7 @@ function mapAirtableToTransaction(record, month, year) {
     if (cat === 'Receita') {
         type = 'income'; value = f['Valor (R$)'] || 0; category = subCat || 'Salário';
     } else if (cat === 'Aplicações') {
-        type = 'investment'; value = f['Aporte (R$)'] || 0; category = subCat || 'Investimento';
+        type = 'investment'; value = f['Valor (R$)'] || f['Aporte (R$)'] || 0; category = subCat || 'Investimento';
     } else {
         type = 'expense'; value = f['Valor (R$)'] || 0; category = subCat || cat || 'Outros';
     }

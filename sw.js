@@ -24,6 +24,9 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Não interceptar chamadas externas (Airtable API etc.)
+  if (!event.request.url.startsWith(self.location.origin)) return;
+
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
