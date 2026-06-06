@@ -15,21 +15,24 @@
     <title>Painel Financeiro Pro</title>
     <style>
         :root {
-            --bg-main: #f8fafc; --bg-card: #ffffff; --bg-th: #f1f5f9;
-            --text-main: #0f172a; --text-muted: #64748b;
-            --primary: #0284c7; --primary-hover: #0369a1;
-            --success: #10b981; --success-light: #ecfdf5;
-            --warning: #f59e0b; --warning-light: #fffbeb;
-            --danger: #ef4444; --danger-light: #fef2f2;
+            --bg-main: #f4f6f8; --bg-card: #ffffff; --bg-th: #f1f4f7;
+            --text-main: #1a202c; --text-muted: #718096;
+            --primary: #2d6a9f; --primary-hover: #245a8a;
+            --accent: #3d7ebf;
+            --success: #38a169; --success-light: #f0fff4;
+            --warning: #d69e2e; --warning-light: #fffff0;
+            --danger: #c53030; --danger-light: #fff5f5;
+            --neutral: #4a5568; --neutral-light: #edf2f7;
             --border: #e2e8f0;
-            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
-            --radius: 12px; --transition: all 0.3s ease;
+            --shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 1px 3px rgb(0 0 0 / 0.04);
+            --shadow-hover: 0 6px 16px rgb(0 0 0 / 0.10), 0 2px 6px rgb(0 0 0 / 0.06);
+            --radius: 12px; --transition: all 0.2s ease;
         }
         body.dark-theme {
-            --bg-main: #0f172a; --bg-card: #1e293b; --bg-th: #334155;
-            --text-main: #f8fafc; --text-muted: #94a3b8; --border: #334155;
-            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
-            --success-light: rgba(16,185,129,0.15); --warning-light: rgba(245,158,11,0.15); --danger-light: rgba(239,68,68,0.15);
+            --bg-main: #0f172a; --bg-card: #1e293b; --bg-th: #2d3748;
+            --text-main: #f7fafc; --text-muted: #a0aec0; --border: #2d3748;
+            --shadow: 0 2px 8px rgb(0 0 0 / 0.3); --shadow-hover: 0 6px 16px rgb(0 0 0 / 0.4);
+            --success-light: rgba(56,161,105,0.12); --warning-light: rgba(214,158,46,0.12); --danger-light: rgba(197,48,48,0.12); --neutral-light: rgba(74,85,104,0.2);
         }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
         body { background-color: var(--bg-main); color: var(--text-main); padding: 20px; padding-top: env(safe-area-inset-top,20px); padding-bottom: calc(env(safe-area-inset-bottom,0px) + 20px); min-height: 100vh; transition: var(--transition); }
@@ -51,45 +54,61 @@
         .nav-tabs::-webkit-scrollbar { display:none; }
         .tab-btn { border:none; background:transparent; padding:10px 20px; font-size:14px; font-weight:600; color:var(--text-muted); cursor:pointer; border-radius:8px; white-space:nowrap; transition:var(--transition); }
         .tab-btn.active { background:var(--primary); color:white; }
+        .tab-btn:hover:not(.active) { background:var(--neutral-light); color:var(--text-main); }
         .btn { padding:10px 18px; border-radius:8px; font-size:14px; font-weight:600; border:none; cursor:pointer; display:inline-flex; align-items:center; gap:8px; transition:var(--transition); }
         .btn-primary { background:var(--primary); color:white; } .btn-primary:hover { background:var(--primary-hover); }
         .btn-secondary { background:var(--border); color:var(--text-main); }
         .btn-sm { padding:6px 12px; font-size:13px; }
-        .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:16px; margin-bottom:24px; }
-        .card { background:var(--bg-card); padding:20px; border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); transition:var(--transition); }
-        .card-title { font-size:12px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-bottom:8px; letter-spacing:0.5px; }
-        .card-value { font-size:24px; font-weight:700; margin-bottom:4px; }
+        .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-bottom:24px; }
+
+        /* Cards clicáveis */
+        .card { background:var(--bg-card); padding:20px; border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); transition:var(--transition); cursor:pointer; user-select:none; position:relative; overflow:hidden; }
+        .card:hover { box-shadow:var(--shadow-hover); transform:translateY(-2px); border-color:var(--primary); }
+        .card:active { transform:translateY(0); box-shadow:var(--shadow); }
+        .card::after { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--card-accent, var(--border)); border-radius:var(--radius) var(--radius) 0 0; }
+        .card-income::after  { --card-accent: var(--success); }
+        .card-expense::after { --card-accent: var(--danger); }
+        .card-invest::after  { --card-accent: var(--primary); }
+        .card-neutral::after { --card-accent: var(--neutral); }
+        .card-title { font-size:11px; color:var(--text-muted); text-transform:uppercase; font-weight:600; margin-bottom:10px; letter-spacing:0.6px; }
+        .card-value { font-size:22px; font-weight:700; margin-bottom:4px; color:var(--text-main); }
         .card-sub { font-size:12px; color:var(--text-muted); }
+
         .tab-content { display:none; } .tab-content.active { display:block; }
         .dashboard-row { display:grid; grid-template-columns:2fr 1fr; gap:24px; margin-bottom:24px; }
         .alerts-panel { background:var(--bg-card); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); border:1px solid var(--border); }
-        .alert-item { padding:12px 16px; border-radius:8px; margin-bottom:12px; font-size:14px; display:flex; align-items:center; gap:12px; font-weight:500; }
-        .alert-success { background:var(--success-light); color:var(--success); border-left:4px solid var(--success); }
-        .alert-warning { background:var(--warning-light); color:var(--warning); border-left:4px solid var(--warning); }
-        .alert-danger { background:var(--danger-light); color:var(--danger); border-left:4px solid var(--danger); }
+        .alert-item { padding:12px 14px; border-radius:8px; margin-bottom:10px; font-size:13px; display:flex; align-items:center; gap:10px; font-weight:500; }
+        .alert-success { background:var(--success-light); color:var(--success); border-left:3px solid var(--success); }
+        .alert-warning { background:var(--warning-light); color:var(--warning); border-left:3px solid var(--warning); }
+        .alert-danger  { background:var(--danger-light);  color:var(--danger);  border-left:3px solid var(--danger); }
         .table-container { background:var(--bg-card); border-radius:var(--radius); box-shadow:var(--shadow); border:1px solid var(--border); overflow-x:auto; }
         table { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
-        th, td { padding:14px 18px; border-bottom:1px solid var(--border); }
-        th { background:var(--bg-th); color:var(--text-muted); font-weight:600; }
-        tr:hover { background:rgba(0,0,0,0.01); }
-        .badge { padding:4px 8px; border-radius:6px; font-size:11px; font-weight:600; display:inline-block; }
-        .badge-paid { background:var(--success-light); color:var(--success); }
-        .badge-pending { background:var(--warning-light); color:var(--warning); }
-        .badge-today { background:rgba(2,132,199,0.15); color:var(--primary); }
-        .badge-overdue { background:var(--danger-light); color:var(--danger); }
+        th, td { padding:13px 18px; border-bottom:1px solid var(--border); }
+        th { background:var(--bg-th); color:var(--text-muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:0.4px; }
+        tr:hover { background:rgba(45,106,159,0.03); }
+        .badge { padding:3px 8px; border-radius:20px; font-size:11px; font-weight:600; display:inline-block; }
+        .badge-paid    { background:var(--success-light); color:var(--success); }
+        .badge-pending { background:var(--neutral-light);  color:var(--neutral); }
+        .badge-today   { background:rgba(45,106,159,0.12); color:var(--primary); }
+        .badge-overdue { background:var(--danger-light);  color:var(--danger); }
         .actions-cell { display:flex; gap:8px; flex-wrap:wrap; }
-        .btn-action { border:1px solid var(--border); background:var(--bg-main); cursor:pointer; padding:6px 10px; font-size:14px; border-radius:6px; color:var(--text-main); transition:var(--transition); }
-        .btn-action:hover { border-color:var(--primary); color:var(--primary); }
-        .btn-action.delete:hover { border-color:var(--danger); color:var(--danger); }
-        .traffic-light { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:6px; }
+        .btn-action { border:1px solid var(--border); background:var(--bg-main); cursor:pointer; padding:6px 10px; font-size:14px; border-radius:6px; color:var(--text-muted); transition:var(--transition); }
+        .btn-action:hover { border-color:var(--primary); color:var(--primary); background:rgba(45,106,159,0.06); }
+        .btn-action.delete:hover { border-color:var(--danger); color:var(--danger); background:var(--danger-light); }
+        .traffic-light { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }
         .bg-success { background-color:var(--success); } .bg-warning { background-color:var(--warning); } .bg-danger { background-color:var(--danger); }
-        .progress-bar-container { background:var(--bg-th); border-radius:20px; height:10px; width:100%; overflow:hidden; margin-top:8px; }
-        .progress-bar { height:100%; background:var(--primary); border-radius:20px; transition:width 0.4s ease; }
+        .progress-bar-container { background:var(--bg-th); border-radius:20px; height:8px; width:100%; overflow:hidden; margin-top:6px; }
+        .progress-bar { height:100%; background:var(--neutral); border-radius:20px; transition:width 0.4s ease; }
+
+        /* Gráfico clicável */
         .chart-wrapper { background:var(--bg-card); border-radius:var(--radius); padding:20px; box-shadow:var(--shadow); border:1px solid var(--border); min-height:300px; display:flex; flex-direction:column; justify-content:space-between; }
-        .chart-header { font-weight:600; margin-bottom:16px; font-size:15px; color:var(--text-main); }
-        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(4px); justify-content:center; align-items:center; z-index:1000; padding:16px; }
+        .chart-header { font-weight:600; margin-bottom:16px; font-size:14px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; }
+        .chart-bar-group { cursor:pointer; transition:var(--transition); border-radius:4px; }
+        .chart-bar-group:hover { opacity:0.8; }
+
+        .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(15,23,42,0.5); backdrop-filter:blur(4px); justify-content:center; align-items:center; z-index:1000; padding:16px; }
         .modal.active { display:flex; }
-        .modal-content { background:var(--bg-card); border-radius:var(--radius); padding:24px; width:100%; max-width:500px; box-shadow:var(--shadow); border:1px solid var(--border); max-height:90vh; overflow-y:auto; }
+        .modal-content { background:var(--bg-card); border-radius:var(--radius); padding:24px; width:100%; max-width:500px; box-shadow:var(--shadow-hover); border:1px solid var(--border); max-height:90vh; overflow-y:auto; }
         .modal-title { font-size:18px; font-weight:700; margin-bottom:16px; }
         .form-group { margin-bottom:14px; }
         .form-group label { display:block; font-size:12px; font-weight:600; color:var(--text-muted); margin-bottom:6px; }
@@ -191,16 +210,12 @@
         <div class="metrics-grid" id="investments-cards"></div>
         <div class="dashboard-row">
             <div class="chart-wrapper">
-                <div class="chart-header">Acompanhamento da Meta Anual</div>
-                <div style="padding:20px 0;">
-                    <div style="display:flex;justify-content:space-between;font-weight:600;font-size:14px;"><span>Progresso Geral</span><span id="investment-goal-pct">0%</span></div>
-                    <div class="progress-bar-container"><div class="progress-bar" id="investment-goal-bar" style="width:0%;"></div></div>
-                    <p style="font-size:12px;color:var(--text-muted);margin-top:8px;" id="investment-goal-desc"></p>
-                </div>
+                <div class="chart-header">Investimento Total — Mês a Mês</div>
+                <div id="invest-line-chart"></div>
             </div>
             <div class="chart-wrapper">
-                <div class="chart-header">Alocação por Custodiante</div>
-                <div id="institution-distribution" style="display:flex;flex-direction:column;gap:14px;"></div>
+                <div class="chart-header">Aportes — Mês a Mês</div>
+                <div id="aporte-line-chart"></div>
             </div>
         </div>
     </div>
@@ -248,7 +263,7 @@ let appState = loadState() || {
 let nextId = Math.max(0, ...appState.transactions.map(t => t.id || 0)) + 1;
 
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-const CATEGORY_COLORS = ['#0284c7','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const CATEGORY_COLORS = ['#4a5568','#2d6a9f','#718096','#2c7a7b','#553c9a','#975a16','#276749','#822727'];
 const CAT_LIMITS = {Moradia:2000,Alimentação:800,Transporte:400,Saúde:600,Lazer:300,Educação:500,Serviços:400,Cartão:1500,Veículo:600,Imposto:500,Outros:300};
 
 function saveState() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appState)); } catch(e) {} }
@@ -285,12 +300,12 @@ function mapAirtableToTransaction(record, month, year) {
     if (cat === 'Receita') {
         type = 'income'; value = f['Valor (R$)'] || 0; category = subCat || 'Salário';
     } else if (cat === 'Aplicações') {
-        type = 'investment'; value = f['Valor (R$)'] || f['Aporte (R$)'] || 0; category = subCat || 'Investimento';
+        type = 'investment'; value = f['Valor (R$)'] || 0; category = subCat || 'Investimento';
     } else {
         type = 'expense'; value = f['Valor (R$)'] || 0; category = subCat || cat || 'Outros';
     }
 
-    return { id: nextId++, airtableId: record.id, airtableCategoria: cat, type, desc: f['Descrição'] || '', value, category, dueDate, paid: f['Pago'] || false };
+    return { id: nextId++, airtableId: record.id, airtableCategoria: cat, type, desc: f['Descrição'] || '', value, aporte: f['Aporte (R$)'] || 0, category, dueDate, paid: f['Pago'] || false };
 }
 
 function mapTransactionToAirtableFields(t) {
@@ -361,12 +376,58 @@ function getMonthTransactions(type = null) {
     });
 }
 
+async function loadMonthSilent(month, year) {
+    try {
+        const table = encodeURIComponent(AT_MONTHS[month]);
+        let records = [], offset = null;
+        do {
+            const path = table + (offset ? `?offset=${encodeURIComponent(offset)}` : '');
+            const data = await atFetch('GET', path);
+            if (data.error) return;
+            records = records.concat(data.records || []);
+            offset = data.offset || null;
+        } while (offset);
+        appState.transactions = appState.transactions.filter(t => {
+            const d = new Date(t.dueDate + 'T00:00:00');
+            return !(d.getMonth() === month && d.getFullYear() === year);
+        });
+        records.forEach(r => appState.transactions.push(mapAirtableToTransaction(r, month, year)));
+        saveState();
+    } catch(e) { console.error(`Erro ao carregar ${AT_MONTHS[month]}:`, e); }
+}
+
+async function loadAllMonthsForYear(year) {
+    if (!getToken()) return;
+    setSyncStatus('loading');
+    const maxMonth = year === appState.currentYear ? appState.currentMonth : 11;
+    await Promise.all(Array.from({length: maxMonth + 1}, (_, m) => loadMonthSilent(m, year)));
+    setSyncStatus('synced');
+    renderAll();
+}
+
+function goToTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+    document.querySelector(`.tab-btn[onclick="switchTab('${tabId}')"]`)?.classList.add('active');
+    renderAll();
+}
+
+function jumpToMonth(month, year) {
+    appState.currentMonth = month;
+    appState.currentYear  = year;
+    document.getElementById('current-month-display').textContent = `${MONTH_NAMES[month]} ${year}`;
+    saveState();
+    loadMonthFromAirtable(month, year);
+}
+
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
     event.target.classList.add('active');
     renderAll();
+    if (tabId === 'investimentos') loadAllMonthsForYear(appState.currentYear);
 }
 
 function renderAll() { renderOverview(); renderCashflow(); renderCategories(); renderInvestments(); }
@@ -381,22 +442,26 @@ function renderOverview() {
     const invests  = getMonthTransactions('investment');
     const totalExpense = expenses.reduce((s,t) => s+t.value, 0);
     const totalIncome  = incomes.reduce((s,t)  => s+t.value, 0);
-    const totalInvest  = invests.reduce((s,t)  => s+t.value, 0);
-    const balance = totalIncome - totalExpense - totalInvest;
+    const balance = totalIncome - totalExpense;
     const paidExpenses = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
     const pendingExp = totalExpense - paidExpenses;
-    const allInvestedUpToMonth = appState.transactions.filter(t => {
-        if (t.type !== 'investment' || !t.paid) return false;
+    // INVESTIDO NO MÊS = soma de Aporte (R$) acumulada até o mês atual
+    const totalInvest = appState.transactions.filter(t => {
         const d = new Date(t.dueDate + 'T00:00:00');
-        return d.getFullYear() < appState.currentYear || (d.getFullYear() === appState.currentYear && d.getMonth() <= appState.currentMonth);
-    }).reduce((s,t) => s+t.value, 0);
+        return d.getFullYear() < appState.currentYear ||
+               (d.getFullYear() === appState.currentYear && d.getMonth() <= appState.currentMonth);
+    }).reduce((s,t) => s+(t.aporte||0), 0);
+    // TOTAL INVESTIDO = saldo atual = soma de Valor (R$) Aplicações/Investimento do mês visualizado
+    const allInvestedUpToMonth = getMonthTransactions('investment')
+        .filter(t => t.category === 'Investimento')
+        .reduce((s,t) => s+t.value, 0);
     const cards = [
-        {title:'Receita Total',    value:fmt(totalIncome),  sub:`${incomes.filter(t=>t.paid).length} recebido(s)`,  color:'var(--success)'},
-        {title:'Despesas Total',   value:fmt(totalExpense), sub:`${fmt(pendingExp)} a pagar`,                        color:'var(--danger)'},
-        {title:'Investido no Mês', value:fmt(totalInvest),  sub:'Aportes do mês',                                   color:'var(--primary)'},
-        {title:'Total Investido',  value:fmt(allInvestedUpToMonth), sub:'Acumulado até este mês',                   color:'var(--success)'},
+        {title:'Receita Total',    value:fmt(totalIncome),          sub:`${incomes.filter(t=>t.paid).length} recebido(s)`,  cls:'card-income',  tab:'fluxo-caixa'},
+        {title:'Despesas Total',   value:fmt(totalExpense),         sub:`${fmt(pendingExp)} a pagar`,                        cls:'card-expense', tab:'fluxo-caixa'},
+        {title:'Investido no Mês', value:fmt(totalInvest),          sub:'Aportes do mês',                                   cls:'card-invest',  tab:'investimentos'},
+        {title:'Total Investido',  value:fmt(allInvestedUpToMonth), sub:'Acumulado até este mês',                            cls:'card-invest',  tab:'investimentos'},
     ];
-    document.getElementById('overview-cards').innerHTML = cards.map(c => `<div class="card"><div class="card-title">${c.title}</div><div class="card-value" style="color:${c.color}">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
+    document.getElementById('overview-cards').innerHTML = cards.map(c => `<div class="card ${c.cls}" onclick="goToTab('${c.tab}')" title="Ver ${c.title}"><div class="card-title">${c.title}</div><div class="card-value">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
     renderEvolutionChart();
     const alerts = [];
     if (balance < 0) alerts.push({type:'danger',  icon:'🚨', msg:'Saldo negativo! Despesas superam receitas.'});
@@ -412,10 +477,20 @@ function renderEvolutionChart() {
         let m = appState.currentMonth - i, y = appState.currentYear;
         if (m < 0) { m += 12; y--; }
         const ts = appState.transactions.filter(t => { const d = new Date(t.dueDate+'T00:00:00'); return d.getMonth()===m && d.getFullYear()===y; });
-        months.push({label:MONTH_NAMES[m].substring(0,3), income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0), expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});
+        months.push({m, y, label:MONTH_NAMES[m].substring(0,3), income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0), expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});
     }
     const maxVal = Math.max(...months.map(m => Math.max(m.income, m.expense)), 1);
-    document.getElementById('evolution-chart').innerHTML = months.map(m => `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;"><div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:180px;"><div style="flex:1;background:var(--success);border-radius:4px 4px 0 0;height:${(m.income/maxVal)*100}%;opacity:0.85;"></div><div style="flex:1;background:var(--danger);border-radius:4px 4px 0 0;height:${(m.expense/maxVal)*100}%;opacity:0.85;"></div></div><span style="font-size:11px;color:var(--text-muted);font-weight:600;">${m.label}</span></div>`).join('');
+    document.getElementById('evolution-chart').innerHTML = months.map(mo => {
+        const isCurrent = mo.m === appState.currentMonth && mo.y === appState.currentYear;
+        const border = isCurrent ? 'outline:2px solid var(--primary);outline-offset:3px;border-radius:4px;' : '';
+        return `<div class="chart-bar-group" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;${border}" onclick="jumpToMonth(${mo.m},${mo.y})" title="${MONTH_NAMES[mo.m]} ${mo.y}">
+            <div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:180px;">
+                <div style="flex:1;background:var(--success);border-radius:4px 4px 0 0;height:${(mo.income/maxVal)*100}%;opacity:0.75;" title="Receita: ${fmt(mo.income)}"></div>
+                <div style="flex:1;background:var(--neutral);border-radius:4px 4px 0 0;height:${(mo.expense/maxVal)*100}%;opacity:0.75;" title="Despesa: ${fmt(mo.expense)}"></div>
+            </div>
+            <span style="font-size:11px;color:${isCurrent?'var(--primary)':'var(--text-muted)'};font-weight:${isCurrent?'700':'600'};">${mo.label}</span>
+        </div>`;
+    }).join('');
 }
 
 function renderCashflow() {
@@ -425,7 +500,7 @@ function renderCashflow() {
     const pending = expenses.filter(t => !t.paid).reduce((s,t) => s+t.value, 0);
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('cashflow-cards').innerHTML = `<div class="card"><div class="card-title">Compromissos</div><div class="card-value">${expenses.length}</div><div class="card-sub">No mês</div></div><div class="card"><div class="card-title">Pago</div><div class="card-value" style="color:var(--success)">${fmt(paid)}</div><div class="card-sub">${expenses.filter(t=>t.paid).length} itens</div></div><div class="card"><div class="card-title">A Pagar</div><div class="card-value" style="color:var(--warning)">${fmt(pending)}</div><div class="card-sub">${expenses.filter(t=>!t.paid).length} itens</div></div><div class="card"><div class="card-title">Vence Hoje</div><div class="card-value" style="color:var(--primary)">${expenses.filter(t=>t.dueDate===today).length}</div><div class="card-sub">Itens hoje</div></div>`;
-    const sorted = [...all].sort((a,b) => a.dueDate.localeCompare(b.dueDate));
+    const sorted = [...all].filter(t => t.type !== 'investment').sort((a,b) => a.dueDate.localeCompare(b.dueDate));
     document.getElementById('cashflow-table-body').innerHTML = sorted.map(t => {
         let statusBadge, statusClass;
         if (t.paid) { statusBadge='✅ Pago'; statusClass='badge-paid'; }
@@ -459,25 +534,84 @@ function renderCategories() {
     }).join('');
 }
 
+function fmtShort(v) {
+    if (!v) return '';
+    if (v >= 1000000) return `${(v/1000000).toFixed(1)}M`;
+    if (v >= 1000) return `${(v/1000).toFixed(0)}k`;
+    return v.toFixed(0);
+}
+
+function buildLineChart(monthlyData, color) {
+    const W=460, H=230, pL=10, pR=10, pT=30, pB=36;
+    const cW=W-pL-pR, cH=H-pT-pB;
+    const maxV = Math.max(...monthlyData.map(d=>d.v), 1);
+    const pts = monthlyData.map((d,i) => ({
+        x: pL + (i/11)*cW,
+        y: pT + cH - (d.v/maxV)*cH
+    }));
+    const linePath = pts.map((p,i) => `${i===0?'M':'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaPath = linePath + ` L${pts[11].x.toFixed(1)},${(pT+cH).toFixed(1)} L${pts[0].x.toFixed(1)},${(pT+cH).toFixed(1)} Z`;
+    const lgId = `lg${color.replace('#','')}`;
+
+    const dots = pts.map((p,i) => {
+        const v = monthlyData[i].v;
+        if (!v) return '';
+        const label = fmtShort(v);
+        const isCur = i === appState.currentMonth;
+        return `
+            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isCur?5:4}" fill="${color}" stroke="white" stroke-width="2">
+                <title>${MONTH_NAMES[i].substring(0,3)}: ${fmt(v)}</title>
+            </circle>
+            <text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${color}">${label}</text>`;
+    }).join('');
+
+    const monthLabels = monthlyData.map((d,i) => {
+        const x = pL + (i/11)*cW;
+        const isCur = i === appState.currentMonth;
+        return `<text x="${x.toFixed(1)}" y="${H-4}" text-anchor="middle" font-size="10" font-weight="${isCur?700:400}" fill="${isCur?color:'#718096'}">${MONTH_NAMES[i].substring(0,3)}</text>`;
+    }).join('');
+
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;overflow:visible;">
+        <defs><linearGradient id="${lgId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${color}" stop-opacity="0.15"/>
+            <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${areaPath}" fill="url(#${lgId})" />
+        <path d="${linePath}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+        ${dots}${monthLabels}
+    </svg>`;
+}
+
 function renderInvestments() {
-    const all = appState.transactions.filter(t => t.type === 'investment');
-    const month = getMonthTransactions('investment');
-    const totalInvested = all.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
-    const monthInvest = month.reduce((s,t) => s+t.value, 0);
-    const goalPct = Math.min((totalInvested/appState.investmentGoal)*100, 100);
-    const monthsWithInvestments = new Set(all.filter(t=>t.paid).map(t=>{const d=new Date(t.dueDate+'T00:00:00');return `${d.getFullYear()}-${d.getMonth()}`;}));
-    const numMonths = monthsWithInvestments.size || 1;
+    const year = appState.currentYear;
+    // INVESTIMENTO TOTAL = saldo do mês visualizado (Aplicações/Investimento)
+    const totalInvested = getMonthTransactions('investment')
+        .filter(t => t.category === 'Investimento')
+        .reduce((s,t) => s+t.value, 0);
+    // APORTE TOTAL = soma de Aporte (R$) acumulada até o mês atual
+    const monthAporte = appState.transactions.filter(t => {
+        const d = new Date(t.dueDate + 'T00:00:00');
+        return d.getFullYear() < year || (d.getFullYear() === year && d.getMonth() <= appState.currentMonth);
+    }).reduce((s,t) => s+(t.aporte||0), 0);
+
     document.getElementById('investments-cards').innerHTML = `
-        <div class="card"><div class="card-title">Total Acumulado</div><div class="card-value" style="color:var(--primary)">${fmt(totalInvested)}</div><div class="card-sub">Todos os períodos</div></div>
-        <div class="card"><div class="card-title">Este Mês</div><div class="card-value">${fmt(monthInvest)}</div><div class="card-sub">${month.length} aportes</div></div>
-        <div class="card"><div class="card-title">Aporte Total</div><div class="card-value" style="color:var(--success)">${fmt(totalInvested)}</div><div class="card-sub">${all.filter(t=>t.paid).length} aportes realizados</div></div>
-        <div class="card"><div class="card-title">Média por Mês</div><div class="card-value" style="color:var(--warning)">${fmt(totalInvested/numMonths)}</div><div class="card-sub">Em ${numMonths} ${numMonths===1?'mês':'meses'} com aportes</div></div>`;
-    document.getElementById('investment-goal-pct').textContent = `${goalPct.toFixed(0)}%`;
-    document.getElementById('investment-goal-bar').style.width = `${goalPct}%`;
-    document.getElementById('investment-goal-desc').textContent = `${fmt(totalInvested)} investidos de ${fmt(appState.investmentGoal)} de meta`;
-    const instMap = {}; all.filter(t=>t.paid).forEach(t=>{const inst=t.institution||'Outros';instMap[inst]=(instMap[inst]||0)+t.value;});
-    const instEntries = Object.entries(instMap), instTotal = instEntries.reduce((s,[,v])=>s+v,0)||1;
-    document.getElementById('institution-distribution').innerHTML = instEntries.map(([inst,val],i)=>{const pct=(val/instTotal)*100;return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span style="font-weight:600">${inst}</span><span>${fmt(val)} (${pct.toFixed(0)}%)</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:${CATEGORY_COLORS[i%CATEGORY_COLORS.length]}"></div></div></div>`;}).join('') || '<p style="color:var(--text-muted);font-size:14px;">Nenhum investimento registrado.</p>';
+        <div class="card card-invest"><div class="card-title">Investimento Total</div><div class="card-value">${fmt(totalInvested)}</div><div class="card-sub">Saldo do mês visualizado</div></div>
+        <div class="card card-invest"><div class="card-title">Aporte Total</div><div class="card-value">${fmt(monthAporte)}</div><div class="card-sub">Acumulado até este mês</div></div>`;
+
+    // Dados mensais para os gráficos (apenas o ano atual)
+    const investByMonth = Array.from({length:12}, (_,m) => ({
+        m, v: appState.transactions
+            .filter(t => { const d=new Date(t.dueDate+'T00:00:00'); return t.type==='investment' && t.category==='Investimento' && d.getFullYear()===year && d.getMonth()===m; })
+            .reduce((s,t) => s+t.value, 0)
+    }));
+    const aporteByMonth = Array.from({length:12}, (_,m) => ({
+        m, v: appState.transactions
+            .filter(t => { const d=new Date(t.dueDate+'T00:00:00'); return d.getFullYear()===year && d.getMonth()===m && (t.aporte||0)>0; })
+            .reduce((s,t) => s+(t.aporte||0), 0)
+    }));
+
+    document.getElementById('invest-line-chart').innerHTML = buildLineChart(investByMonth, '#2d6a9f');
+    document.getElementById('aporte-line-chart').innerHTML = buildLineChart(aporteByMonth, '#38a169');
 }
 
 // ================================================
