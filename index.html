@@ -95,6 +95,18 @@
         .btn-action { border:1px solid var(--border); background:var(--bg-main); cursor:pointer; padding:6px 10px; font-size:14px; border-radius:6px; color:var(--text-muted); transition:var(--transition); }
         .btn-action:hover { border-color:var(--primary); color:var(--primary); background:rgba(45,106,159,0.06); }
         .btn-action.delete:hover { border-color:var(--danger); color:var(--danger); background:var(--danger-light); }
+        /* Cashflow timeline */
+        .cf-filter { border:1px solid var(--border); background:var(--bg-main); color:var(--text-muted); padding:5px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; transition:var(--transition); }
+        .cf-filter.active, .cf-filter:hover { background:var(--primary); color:white; border-color:var(--primary); }
+        .cf-row { display:flex; align-items:center; gap:12px; background:var(--bg-card); border:1px solid var(--border); border-radius:10px; padding:12px 16px; margin-bottom:8px; transition:var(--transition); cursor:default; }
+        .cf-row:hover { box-shadow:var(--shadow-hover); border-color:rgba(45,106,159,0.3); }
+        .cf-row.overdue { border-left:3px solid var(--danger); }
+        .cf-row.today   { border-left:3px solid var(--primary); }
+        .cf-row.paid    { opacity:0.65; }
+        .cf-desc { flex:1; font-size:14px; font-weight:600; color:var(--text-main); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .cf-due  { font-size:12px; color:var(--text-muted); white-space:nowrap; min-width:64px; text-align:center; }
+        .cf-val  { font-size:14px; font-weight:700; color:var(--text-main); white-space:nowrap; min-width:90px; text-align:right; }
+        .cf-actions { display:flex; gap:6px; flex-shrink:0; }
         .traffic-light { width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:6px; }
         .bg-success { background-color:var(--success); } .bg-warning { background-color:var(--warning); } .bg-danger { background-color:var(--danger); }
         .progress-bar-container { background:var(--bg-th); border-radius:20px; height:8px; width:100%; overflow:hidden; margin-top:6px; }
@@ -186,13 +198,16 @@
     </div>
     <div id="fluxo-caixa" class="tab-content">
         <div class="metrics-grid" id="cashflow-cards"></div>
-        <div class="chart-header" style="margin-bottom:12px;">Linha do Tempo de Compromissos</div>
-        <div class="table-container">
-            <table>
-                <thead><tr><th>Vencimento</th><th>Descrição</th><th>Categoria</th><th>Valor (R$)</th><th>Status</th><th>Ações</th></tr></thead>
-                <tbody id="cashflow-table-body"></tbody>
-            </table>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div class="chart-header" style="margin:0;">Linha do Tempo de Compromissos</div>
+            <div style="display:flex;gap:6px;" id="cashflow-filters">
+                <button class="cf-filter active" onclick="setCashflowFilter('todos')">Todos</button>
+                <button class="cf-filter" onclick="setCashflowFilter('pendente')">Pendentes</button>
+                <button class="cf-filter" onclick="setCashflowFilter('pago')">Pagos</button>
+                <button class="cf-filter" onclick="setCashflowFilter('atrasado')">Atrasados</button>
+            </div>
         </div>
+        <div id="cashflow-timeline"></div>
     </div>
     <div id="categorias" class="tab-content">
         <div class="dashboard-row">
@@ -225,7 +240,7 @@
         <div class="modal-title">⚙️ Configuração Airtable</div>
         <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Cole seu Personal Access Token do Airtable para conectar o app aos seus dados. O token é salvo apenas no seu dispositivo.</p>
         <div class="form-group"><label>Personal Access Token</label><input type="password" class="form-control" id="config-token" placeholder="patXXXXXX.XXXXXXXX"></div>
-        <div class="modal-actions"><button class="btn btn-primary" onclick="saveConfig()">Conectar</button></div>
+        <div class="modal-actions"><button class="btn btn-secondary" onclick="loadDemoData()">🎭 Ver Demo</button><button class="btn btn-primary" onclick="saveConfig()">Conectar</button></div>
     </div>
 </div>
 <div class="modal" id="transaction-modal">
@@ -477,39 +492,87 @@ function renderEvolutionChart() {
         let m = appState.currentMonth - i, y = appState.currentYear;
         if (m < 0) { m += 12; y--; }
         const ts = appState.transactions.filter(t => { const d = new Date(t.dueDate+'T00:00:00'); return d.getMonth()===m && d.getFullYear()===y; });
-        months.push({m, y, label:MONTH_NAMES[m].substring(0,3), income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0), expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});
+        months.push({m, y, label:MONTH_NAMES[m].substring(0,3),
+            income:ts.filter(t=>t.type==='income').reduce((s,t)=>s+t.value,0),
+            expense:ts.filter(t=>t.type==='expense').reduce((s,t)=>s+t.value,0)});
     }
     const maxVal = Math.max(...months.map(m => Math.max(m.income, m.expense)), 1);
     document.getElementById('evolution-chart').innerHTML = months.map(mo => {
         const isCurrent = mo.m === appState.currentMonth && mo.y === appState.currentYear;
         const border = isCurrent ? 'outline:2px solid var(--primary);outline-offset:3px;border-radius:4px;' : '';
-        return `<div class="chart-bar-group" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;${border}" onclick="jumpToMonth(${mo.m},${mo.y})" title="${MONTH_NAMES[mo.m]} ${mo.y}">
-            <div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:180px;">
-                <div style="flex:1;background:var(--success);border-radius:4px 4px 0 0;height:${(mo.income/maxVal)*100}%;opacity:0.75;" title="Receita: ${fmt(mo.income)}"></div>
-                <div style="flex:1;background:var(--neutral);border-radius:4px 4px 0 0;height:${(mo.expense/maxVal)*100}%;opacity:0.75;" title="Despesa: ${fmt(mo.expense)}"></div>
+        const incH = Math.max((mo.income/maxVal)*140, mo.income>0?4:0);
+        const expH = Math.max((mo.expense/maxVal)*140, mo.expense>0?4:0);
+        return `<div class="chart-bar-group" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;${border}" onclick="jumpToMonth(${mo.m},${mo.y})" title="${MONTH_NAMES[mo.m]} ${mo.y}: Receita ${fmt(mo.income)} | Despesa ${fmt(mo.expense)}">
+            <div style="width:100%;display:flex;gap:3px;align-items:flex-end;height:160px;position:relative;">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+                    ${mo.income>0?`<span style="font-size:12px;font-weight:700;color:var(--success);margin-bottom:2px;white-space:nowrap;">${fmtShort(mo.income)}</span>`:''}
+                    <div style="width:100%;background:var(--success);border-radius:4px 4px 0 0;height:${incH}px;opacity:0.8;"></div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;">
+                    ${mo.expense>0?`<span style="font-size:12px;font-weight:700;color:var(--neutral);margin-bottom:2px;white-space:nowrap;">${fmtShort(mo.expense)}</span>`:''}
+                    <div style="width:100%;background:var(--neutral);border-radius:4px 4px 0 0;height:${expH}px;opacity:0.8;"></div>
+                </div>
             </div>
             <span style="font-size:11px;color:${isCurrent?'var(--primary)':'var(--text-muted)'};font-weight:${isCurrent?'700':'600'};">${mo.label}</span>
         </div>`;
     }).join('');
 }
 
+let _cashflowFilter = 'todos';
+function setCashflowFilter(f) {
+    _cashflowFilter = f;
+    document.querySelectorAll('.cf-filter').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    renderCashflow();
+}
 function renderCashflow() {
     const all = getMonthTransactions();
     const expenses = all.filter(t => t.type === 'expense');
-    const paid = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
+    const incomes  = all.filter(t => t.type === 'income');
+    const paid    = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
     const pending = expenses.filter(t => !t.paid).reduce((s,t) => s+t.value, 0);
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('cashflow-cards').innerHTML = `<div class="card"><div class="card-title">Compromissos</div><div class="card-value">${expenses.length}</div><div class="card-sub">No mês</div></div><div class="card"><div class="card-title">Pago</div><div class="card-value" style="color:var(--success)">${fmt(paid)}</div><div class="card-sub">${expenses.filter(t=>t.paid).length} itens</div></div><div class="card"><div class="card-title">A Pagar</div><div class="card-value" style="color:var(--warning)">${fmt(pending)}</div><div class="card-sub">${expenses.filter(t=>!t.paid).length} itens</div></div><div class="card"><div class="card-title">Vence Hoje</div><div class="card-value" style="color:var(--primary)">${expenses.filter(t=>t.dueDate===today).length}</div><div class="card-sub">Itens hoje</div></div>`;
+    const today   = new Date().toISOString().split('T')[0];
+    const overdue = expenses.filter(t => !t.paid && t.dueDate < today);
+    const paidPct = expenses.length ? Math.round((expenses.filter(t=>t.paid).length / expenses.length)*100) : 0;
+    document.getElementById('cashflow-cards').innerHTML = `
+        <div class="card card-expense" onclick="setCashflowFilter('pendente');document.querySelectorAll('.cf-filter').forEach(b=>{b.classList.remove('active');if(b.textContent==='Pendentes')b.classList.add('active')});renderCashflow()" title="Ver pendentes">
+            <div class="card-title">A Pagar</div><div class="card-value" style="color:var(--warning)">${fmt(pending)}</div><div class="card-sub">${expenses.filter(t=>!t.paid).length} pendente(s)</div></div>
+        <div class="card card-income" onclick="setCashflowFilter('pago');document.querySelectorAll('.cf-filter').forEach(b=>{b.classList.remove('active');if(b.textContent==='Pagos')b.classList.add('active')});renderCashflow()" title="Ver pagos">
+            <div class="card-title">Pago</div><div class="card-value" style="color:var(--success)">${fmt(paid)}</div><div class="card-sub">${paidPct}% quitado</div></div>
+        <div class="card card-neutral" onclick="setCashflowFilter('atrasado');document.querySelectorAll('.cf-filter').forEach(b=>{b.classList.remove('active');if(b.textContent==='Atrasados')b.classList.add('active')});renderCashflow()" title="Ver atrasados">
+            <div class="card-title">Atrasados</div><div class="card-value" style="color:var(--danger)">${overdue.length}</div><div class="card-sub">${overdue.length>0?fmt(overdue.reduce((s,t)=>s+t.value,0)):'Nenhum'}</div></div>
+        <div class="card card-income" onclick="setCashflowFilter('todos');document.querySelectorAll('.cf-filter').forEach(b=>{b.classList.remove('active');if(b.textContent==='Todos')b.classList.add('active')});renderCashflow()" title="Ver receitas">
+            <div class="card-title">Receitas</div><div class="card-value" style="color:var(--success)">${fmt(incomes.reduce((s,t)=>s+t.value,0))}</div><div class="card-sub">${incomes.length} lançamento(s)</div></div>`;
+
     const sorted = [...all].filter(t => t.type !== 'investment').sort((a,b) => a.dueDate.localeCompare(b.dueDate));
-    document.getElementById('cashflow-table-body').innerHTML = sorted.map(t => {
-        let statusBadge, statusClass;
-        if (t.paid) { statusBadge='✅ Pago'; statusClass='badge-paid'; }
-        else if (t.dueDate < today) { statusBadge='🔴 Atrasado'; statusClass='badge-overdue'; }
-        else if (t.dueDate === today) { statusBadge='🔔 Hoje'; statusClass='badge-today'; }
-        else { statusBadge='⏳ Pendente'; statusClass='badge-pending'; }
-        const typeIcon = t.type==='income'?'💰':t.type==='investment'?'📈':'💸';
-        return `<tr><td data-label="Vencimento">${t.dueDate.split('-').reverse().join('/')}</td><td data-label="Descrição">${typeIcon} ${t.desc}</td><td data-label="Categoria">${t.category}</td><td data-label="Valor">${fmt(t.value)}</td><td data-label="Status"><span class="badge ${statusClass}">${statusBadge}</span></td><td data-label="Ações"><div class="actions-cell">${!t.paid?`<button class="btn-action" onclick="togglePaid(${t.id})">✅</button>`:`<button class="btn-action" onclick="togglePaid(${t.id})">↩️</button>`}<button class="btn-action delete" onclick="deleteTransaction(${t.id})">🗑️</button></div></td></tr>`;
-    }).join('');
+    let filtered = sorted;
+    if (_cashflowFilter === 'pendente') filtered = sorted.filter(t => !t.paid && t.dueDate >= today);
+    else if (_cashflowFilter === 'pago')    filtered = sorted.filter(t => t.paid);
+    else if (_cashflowFilter === 'atrasado') filtered = sorted.filter(t => !t.paid && t.dueDate < today);
+
+    const typeColor = { income:'var(--success)', expense:'var(--neutral)', investment:'var(--primary)' };
+    const typeIcon  = { income:'💰', expense:'💸', investment:'📈' };
+    document.getElementById('cashflow-timeline').innerHTML = filtered.length === 0
+        ? `<div style="text-align:center;padding:32px;color:var(--text-muted);font-size:14px;">Nenhum compromisso para exibir</div>`
+        : filtered.map(t => {
+            let statusBadge, statusClass, rowClass = '';
+            if (t.paid) { statusBadge='✅ Pago'; statusClass='badge-paid'; rowClass='paid'; }
+            else if (t.dueDate < today) { statusBadge='🔴 Atrasado'; statusClass='badge-overdue'; rowClass='overdue'; }
+            else if (t.dueDate === today) { statusBadge='🔔 Hoje'; statusClass='badge-today'; rowClass='today'; }
+            else { statusBadge='⏳ Pendente'; statusClass='badge-pending'; }
+            const dueFmt = t.dueDate.split('-').slice(1).reverse().join('/'); // dd/mm
+            return `<div class="cf-row ${rowClass}">
+                <span style="font-size:16px;">${typeIcon[t.type]||'💸'}</span>
+                <span class="cf-desc" title="${t.desc}">${t.desc}</span>
+                <span class="cf-due">📅 ${dueFmt}</span>
+                <span class="cf-val" style="color:${typeColor[t.type]||'var(--text-main)'}">${fmt(t.value)}</span>
+                <span class="badge ${statusClass}" style="min-width:80px;text-align:center;">${statusBadge}</span>
+                <div class="cf-actions">
+                    ${!t.paid?`<button class="btn-action" onclick="togglePaid(${t.id})" title="Marcar pago">✅</button>`:`<button class="btn-action" onclick="togglePaid(${t.id})" title="Desfazer">↩️</button>`}
+                    <button class="btn-action delete" onclick="deleteTransaction(${t.id})" title="Excluir">🗑️</button>
+                </div>
+            </div>`;
+        }).join('');
 }
 
 function renderCategories() {
@@ -530,7 +593,7 @@ function renderCategories() {
     document.getElementById('donut-chart-container').innerHTML = `<div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap;justify-content:center;"><svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${paths}</svg><div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">${legend}</div></div>`;
     document.getElementById('categories-ranking').innerHTML = entries.map(([cat,val]) => {
         const limit=CAT_LIMITS[cat]||500, pct=Math.min((val/limit)*100,100), color=pct>=100?'bg-danger':pct>=75?'bg-warning':'bg-success';
-        return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span><span class="traffic-light ${color}"></span>${cat}</span><span style="font-weight:700">${fmt(val)} / ${fmt(limit)}</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:var(--${pct>=100?'danger':pct>=75?'warning':'success'})"></div></div></div>`;
+        return `<div><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span><span class="traffic-light ${color}"></span>${cat}</span><span style="font-weight:700;color:var(--${pct>=100?'danger':pct>=75?'warning':'success'})">${fmt(val)}</span></div><div class="progress-bar-container"><div class="progress-bar" style="width:${pct}%;background:var(--${pct>=100?'danger':pct>=75?'warning':'success'})"></div></div></div>`;
     }).join('');
 }
 
@@ -542,7 +605,7 @@ function fmtShort(v) {
 }
 
 function buildLineChart(monthlyData, color) {
-    const W=460, H=230, pL=10, pR=10, pT=30, pB=36;
+    const W=460, H=260, pL=10, pR=10, pT=40, pB=36;
     const cW=W-pL-pR, cH=H-pT-pB;
     const maxV = Math.max(...monthlyData.map(d=>d.v), 1);
     const pts = monthlyData.map((d,i) => ({
@@ -562,7 +625,7 @@ function buildLineChart(monthlyData, color) {
             <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isCur?5:4}" fill="${color}" stroke="white" stroke-width="2">
                 <title>${MONTH_NAMES[i].substring(0,3)}: ${fmt(v)}</title>
             </circle>
-            <text x="${p.x.toFixed(1)}" y="${(p.y-10).toFixed(1)}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${color}">${label}</text>`;
+            <text x="${p.x.toFixed(1)}" y="${(p.y-11).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" fill="${color}">${label}</text>`;
     }).join('');
 
     const monthLabels = monthlyData.map((d,i) => {
@@ -745,6 +808,39 @@ document.querySelector('.brand').insertAdjacentHTML('afterend',
 function openConfig() {
     document.getElementById('config-token').value = getToken();
     document.getElementById('config-modal').classList.add('active');
+}
+
+// ================================================
+// DEMO DATA
+// ================================================
+function loadDemoData() {
+    document.getElementById('config-modal').classList.remove('active');
+    const y = 2026;
+    appState.transactions = [
+        {id:101,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-06-05',paid:true,aporte:6000,airtableCategoria:'Receita'},
+        {id:102,type:'expense',desc:'Aluguel',value:2200,category:'Moradia',dueDate:'2026-06-05',paid:true,aporte:0,airtableCategoria:'Despesa'},
+        {id:103,type:'expense',desc:'Supermercado',value:650,category:'Alimentação',dueDate:'2026-06-10',paid:false,aporte:0,airtableCategoria:'Despesa'},
+        {id:104,type:'expense',desc:'Energia Elétrica',value:180,category:'Serviços',dueDate:'2026-06-03',paid:false,aporte:0,airtableCategoria:'Despesa'},
+        {id:105,type:'expense',desc:'Plano de Saúde',value:420,category:'Saúde',dueDate:'2026-06-20',paid:false,aporte:0,airtableCategoria:'Despesa'},
+        {id:106,type:'investment',desc:'Tesouro Direto',value:45000,category:'Investimento',dueDate:'2026-06-20',paid:false,aporte:6000,airtableCategoria:'Aplicações'},
+        {id:107,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-05-05',paid:true,aporte:0,airtableCategoria:'Receita'},
+        {id:108,type:'expense',desc:'Aluguel',value:2200,category:'Moradia',dueDate:'2026-05-05',paid:true,aporte:0,airtableCategoria:'Despesa'},
+        {id:109,type:'expense',desc:'Cartão Crédito',value:1100,category:'Cartão',dueDate:'2026-05-20',paid:true,aporte:0,airtableCategoria:'Despesa'},
+        {id:110,type:'investment',desc:'Tesouro Direto',value:43000,category:'Investimento',dueDate:'2026-05-20',paid:true,aporte:3000,airtableCategoria:'Aplicações'},
+        {id:111,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-04-05',paid:true,aporte:0,airtableCategoria:'Receita'},
+        {id:112,type:'expense',desc:'Aluguel',value:2200,category:'Moradia',dueDate:'2026-04-05',paid:true,aporte:0,airtableCategoria:'Despesa'},
+        {id:113,type:'investment',desc:'Tesouro Direto',value:38000,category:'Investimento',dueDate:'2026-04-20',paid:true,aporte:2500,airtableCategoria:'Aplicações'},
+        {id:114,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-03-05',paid:true,aporte:0,airtableCategoria:'Receita'},
+        {id:115,type:'expense',desc:'Aluguel',value:2200,category:'Moradia',dueDate:'2026-03-05',paid:true,aporte:0,airtableCategoria:'Despesa'},
+        {id:116,type:'investment',desc:'Tesouro Direto',value:35000,category:'Investimento',dueDate:'2026-03-20',paid:true,aporte:2000,airtableCategoria:'Aplicações'},
+        {id:117,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-02-05',paid:true,aporte:0,airtableCategoria:'Receita'},
+        {id:118,type:'investment',desc:'Tesouro Direto',value:32000,category:'Investimento',dueDate:'2026-02-20',paid:true,aporte:2000,airtableCategoria:'Aplicações'},
+        {id:119,type:'income',desc:'Salário',value:8000,category:'Salário',dueDate:'2026-01-05',paid:true,aporte:0,airtableCategoria:'Receita'},
+        {id:120,type:'investment',desc:'Tesouro Direto',value:30000,category:'Investimento',dueDate:'2026-01-20',paid:true,aporte:1500,airtableCategoria:'Aplicações'},
+    ];
+    appState.currentMonth = 5; appState.currentYear = 2026;
+    document.getElementById('current-month-display').textContent = 'Junho 2026 (Demo)';
+    renderAll();
 }
 
 // ================================================
