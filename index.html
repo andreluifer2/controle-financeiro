@@ -460,11 +460,10 @@ function renderOverview() {
     const balance = totalIncome - totalExpense;
     const paidExpenses = expenses.filter(t => t.paid).reduce((s,t) => s+t.value, 0);
     const pendingExp = totalExpense - paidExpenses;
-    // INVESTIDO NO MÊS = soma de Aporte (R$) acumulada até o mês atual
+    // INVESTIDO NO MÊS = soma de Aporte (R$) apenas do mês visualizado
     const totalInvest = appState.transactions.filter(t => {
         const d = new Date(t.dueDate + 'T00:00:00');
-        return d.getFullYear() < appState.currentYear ||
-               (d.getFullYear() === appState.currentYear && d.getMonth() <= appState.currentMonth);
+        return d.getFullYear() === appState.currentYear && d.getMonth() === appState.currentMonth;
     }).reduce((s,t) => s+(t.aporte||0), 0);
     // TOTAL INVESTIDO = saldo atual = soma de Valor (R$) Aplicações/Investimento do mês visualizado
     const allInvestedUpToMonth = getMonthTransactions('investment')
@@ -473,7 +472,7 @@ function renderOverview() {
     const cards = [
         {title:'Receita Total',    value:fmt(totalIncome),          sub:`${incomes.filter(t=>t.paid).length} recebido(s)`,  cls:'card-income',  tab:'fluxo-caixa'},
         {title:'Despesas Total',   value:fmt(totalExpense),         sub:`${fmt(pendingExp)} a pagar`,                        cls:'card-expense', tab:'fluxo-caixa'},
-        {title:'Investido no Mês', value:fmt(totalInvest),          sub:'Aportes do mês',                                   cls:'card-invest',  tab:'investimentos'},
+        {title:'Investido no Mês', value:fmt(totalInvest),          sub:`Aportes de ${MONTH_NAMES[appState.currentMonth]}`,  cls:'card-invest',  tab:'investimentos'},
         {title:'Total Investido',  value:fmt(allInvestedUpToMonth), sub:'Acumulado até este mês',                            cls:'card-invest',  tab:'investimentos'},
     ];
     document.getElementById('overview-cards').innerHTML = cards.map(c => `<div class="card ${c.cls}" onclick="goToTab('${c.tab}')" title="Ver ${c.title}"><div class="card-title">${c.title}</div><div class="card-value">${c.value}</div><div class="card-sub">${c.sub}</div></div>`).join('');
